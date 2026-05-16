@@ -70,19 +70,42 @@ function firstLineMatch(lines, re) {
   return lines.find((line) => re.test(line));
 }
 
+function firstPricedLineMatch(lines, re, min, max) {
+  return lines.find(
+    (line) => re.test(line) && numbersFromLine(line, min, max).length > 0,
+  );
+}
+
 function parseFuel(md, region) {
   const regionIndex = region === "2" ? 1 : 0;
   const lines = md.split("\n");
-  const ronLine = firstLineMatch(
+  const ronLine = firstPricedLineMatch(
     lines,
     /RON\s*95(?:-V|-III|\b)|Xăng\s*RON\s*95|RON95/i,
+    FUEL_VND_L_MIN,
+    FUEL_VND_L_MAX,
   );
   const e5Line =
-    firstLineMatch(lines, /E5\s*RON\s*92|E5\s+RON\s*92|Xăng\s*E5\s+RON/i) ??
-    firstLineMatch(lines, /\bE5\b.*\bRON\s*92/i);
+    firstPricedLineMatch(
+      lines,
+      /E5\s*RON\s*92|E5\s+RON\s*92|Xăng\s*E5\s+RON/i,
+      FUEL_VND_L_MIN,
+      FUEL_VND_L_MAX,
+    ) ??
+    firstPricedLineMatch(
+      lines,
+      /\bE5\b.*\bRON\s*92/i,
+      FUEL_VND_L_MIN,
+      FUEL_VND_L_MAX,
+    );
   const dieselLine =
-    firstLineMatch(lines, /DO\s*0[\d,.]*S|Diesel|Dầu\s*DO|DO\s*0/i) ??
-    firstLineMatch(lines, /\bDO\b/i);
+    firstPricedLineMatch(
+      lines,
+      /DO\s*0[\d,.]*S|Diesel|Dầu\s*DO|DO\s*0/i,
+      FUEL_VND_L_MIN,
+      FUEL_VND_L_MAX,
+    ) ??
+    firstPricedLineMatch(lines, /\bDO\b/i, FUEL_VND_L_MIN, FUEL_VND_L_MAX);
 
   const pick = (line) => {
     if (!line) return null;
@@ -107,9 +130,24 @@ function parseFuel(md, region) {
   }
 
   return [
-    { name: "RON 95", price: formatThousands(ron95), unit: "đ/lít", trend: "none" },
-    { name: "E5 RON 92", price: formatThousands(e5), unit: "đ/lít", trend: "none" },
-    { name: "Diesel", price: formatThousands(diesel), unit: "đ/lít", trend: "none" },
+    {
+      name: "RON 95",
+      price: formatThousands(ron95),
+      unit: "đ/lít",
+      trend: "none",
+    },
+    {
+      name: "E5 RON 92",
+      price: formatThousands(e5),
+      unit: "đ/lít",
+      trend: "none",
+    },
+    {
+      name: "Diesel",
+      price: formatThousands(diesel),
+      unit: "đ/lít",
+      trend: "none",
+    },
   ];
 }
 
@@ -137,8 +175,58 @@ function parseGold(md) {
   }
 
   return [
-    { name: "Mua vào", price: formatThousands(buy), unit: "đ/lượng", trend: "none" },
-    { name: "Bán ra", price: formatThousands(sell), unit: "đ/lượng", trend: "none" },
+    {
+      name: "Mua vào",
+      price: formatThousands(buy),
+      unit: "đ/lượng",
+      trend: "none",
+    },
+    {
+      name: "Bán ra",
+      price: formatThousands(sell),
+      unit: "đ/lượng",
+      trend: "none",
+    },
+  ];
+}
+
+async function fetchGoldApiFallback() {
+  const res = await fetch("https://giavang.now/api/prices?type=SJL1L10");
+  if (!res.ok) {
+    console.log(`Gold fallback API failed: ${res.status}`);
+    return null;
+  }
+
+  const json = await res.json();
+  const row = Array.isArray(json?.data) ? json.data[0] : null;
+  const buy = Number(row?.buy);
+  const sell = Number(row?.sell);
+
+  if (
+    !Number.isFinite(buy) ||
+    !Number.isFinite(sell) ||
+    buy < GOLD_VND_MIN ||
+    buy > GOLD_VND_MAX ||
+    sell < GOLD_VND_MIN ||
+    sell > GOLD_VND_MAX
+  ) {
+    console.log("Gold fallback API returned invalid data", { buy, sell });
+    return null;
+  }
+
+  return [
+    {
+      name: "Mua vào",
+      price: formatThousands(buy),
+      unit: "đ/lượng",
+      trend: "none",
+    },
+    {
+      name: "Bán ra",
+      price: formatThousands(sell),
+      unit: "đ/lượng",
+      trend: "none",
+    },
   ];
 }
 
@@ -197,8 +285,22 @@ async function main() {
   ]);
 
   const fuel = fuelMd ? parseFuel(fuelMd, fuelRegion) : null;
-  const gold = goldMd ? parseGold(goldMd) : null;
-  const existing = await fetchExistingSnapshot(supabaseUrl, serviceRoleKey, dateIso);
+  let gold = goldMd ? parseGold(goldMd) : null;
+  if (!gold) {
+    gold = await fetchGoldApiFallback();
+  }
+  const existing = await fetchExistingSnapshot(
+    supabaseUrl,
+    serviceRoleKey,
+    dateIso,
+  );
+
+  if (!fuel && !gold && existing) {
+    console.log("No valid parsed data. Keeping existing snapshot unchanged.", {
+      date: dateIso,
+    });
+    return;
+  }
 
   if (!fuel && !gold && !existing) {
     throw new Error("No valid live data and no existing snapshot to preserve");
