@@ -191,7 +191,7 @@ function parseGold(md) {
   ];
 }
 
-async function fetchGold() {
+async function fetchGoldApiFallback() {
   const res = await fetch(
     "https://sjc.com.vn/GoldPrice/Services/PriceService.ashx",
     {
@@ -236,6 +236,7 @@ async function fetchGold() {
     },
   ];
 }
+
 async function fetchExistingSnapshot(supabaseUrl, serviceRoleKey, dateIso) {
   const url = new URL("/rest/v1/price_snapshots", supabaseUrl);
   url.searchParams.set("date", `eq.${dateIso}`);
