@@ -191,29 +191,35 @@ function parseGold(md) {
   ];
 }
 
-async function fetchGoldApiFallback() {
-  const res = await fetch("https://giavang.now/api/prices?type=SJL1L10");
-  if (!res.ok) {
-    console.log(`Gold fallback API failed: ${res.status}`);
+async function fetchGold() {
+  const res = await fetch(
+    "https://sjc.com.vn/GoldPrice/Services/PriceService.ashx",
+    {
+      headers: {
+        "User-Agent": "Mozilla/5.0",
+        Referer: "https://sjc.com.vn/",
+      },
+    },
+  );
+
+  const text = await res.text();
+
+  console.log("Gold raw:", text);
+
+  // tìm số kiểu 160.500.000
+  const matches = [
+    ...text.matchAll(/\d{1,3}(?:\.\d{3}){2,3}/g),
+  ].map((m) => Number(m[0].replace(/\./g, "")));
+
+  console.log("Gold numbers:", matches);
+
+  if (matches.length < 2) {
+    console.log("Not enough gold values");
     return null;
   }
 
-  const json = await res.json();
-  const row = Array.isArray(json?.data) ? json.data[0] : null;
-  const buy = Number(row?.buy);
-  const sell = Number(row?.sell);
-
-  if (
-    !Number.isFinite(buy) ||
-    !Number.isFinite(sell) ||
-    buy < GOLD_VND_MIN ||
-    buy > GOLD_VND_MAX ||
-    sell < GOLD_VND_MIN ||
-    sell > GOLD_VND_MAX
-  ) {
-    console.log("Gold fallback API returned invalid data", { buy, sell });
-    return null;
-  }
+  const buy = matches[0];
+  const sell = matches[1];
 
   return [
     {
@@ -230,7 +236,6 @@ async function fetchGoldApiFallback() {
     },
   ];
 }
-
 async function fetchExistingSnapshot(supabaseUrl, serviceRoleKey, dateIso) {
   const url = new URL("/rest/v1/price_snapshots", supabaseUrl);
   url.searchParams.set("date", `eq.${dateIso}`);
