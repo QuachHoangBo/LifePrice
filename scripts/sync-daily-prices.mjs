@@ -2,6 +2,7 @@ const FUEL_VND_L_MIN = 13_000;
 const FUEL_VND_L_MAX = 40_000;
 const GOLD_VND_MIN = 55_000_000;
 const GOLD_VND_MAX = 250_000_000;
+const SCRIPT_VERSION = "2026-05-16.2";
 
 function requiredEnv(name) {
   const value = process.env[name]?.trim();
@@ -278,6 +279,7 @@ async function main() {
   const dateIso = todayInVietnam();
 
   console.log(`Syncing prices for ${dateIso}`);
+  console.log(`Price sync script version ${SCRIPT_VERSION}`);
 
   const [fuelMd, goldMd] = await Promise.all([
     firecrawlScrapeMarkdown(fuelUrl, firecrawlApiKey),
@@ -288,6 +290,7 @@ async function main() {
   let gold = goldMd ? parseGold(goldMd) : null;
   if (!gold) {
     gold = await fetchGoldApiFallback();
+    console.log("Gold fallback result", { goldUpdated: Boolean(gold) });
   }
   const existing = await fetchExistingSnapshot(
     supabaseUrl,
