@@ -9,7 +9,6 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { Coins, Droplet, Info } from "lucide-react-native";
 import { DateSelector } from "@/components/DateSelector";
 import { PriceCard } from "@/components/PriceCard";
 import type { TrendChartPoint } from "@/components/TrendChart";
@@ -34,6 +33,8 @@ import {
   saveSnapshot,
 } from "@/lib/priceSnapshots";
 import { syncRemoteSnapshots } from "@/lib/remoteSnapshots";
+import { OnboardingOverlay, useOnboarding } from "@/components/OnboardingOverlay";
+import { Coins, Droplet, HelpCircle, Info } from "lucide-react-native";
 
 export default function HomeScreen() {
   const router = useRouter();
@@ -67,6 +68,7 @@ export default function HomeScreen() {
     setExtraSnapshotDates(dates);
   }, [anchorDate]);
 
+  const { showOnboarding, finishOnboarding, resetOnboarding } = useOnboarding();
   useEffect(() => {
     void refreshSnapshotDates();
   }, [refreshSnapshotDates]);
@@ -132,10 +134,10 @@ export default function HomeScreen() {
         setPrices(withTrends);
         setDataSourceLabel(
           snap.source === "live"
-            ? "Nguồn live đã lưu"
+            ? ""
             : snap.source === "mock"
-              ? "Dữ liệu mô phỏng đã lưu"
-              : "Nguồn dự phòng đã lưu",
+              ? ""
+              : "",
         );
         setLiveLoading(false);
         return;
@@ -226,6 +228,17 @@ export default function HomeScreen() {
                 </Text>
               )}
             </View>
+
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Hướng dẫn"
+              hitSlop={12}
+              onPress={resetOnboarding}
+              className="h-11 w-11 mr-3 items-center justify-center rounded-full bg-white shadow-sm active:opacity-90"
+            >
+              <HelpCircle size={22} color="#047857" strokeWidth={2.25} />
+            </Pressable>
+
             <Pressable
               accessibilityRole="button"
               accessibilityLabel="Thông tin"
@@ -290,6 +303,8 @@ export default function HomeScreen() {
           />
         </View>
       </ScrollView>
+      {showOnboarding && <OnboardingOverlay onFinish={finishOnboarding} />}
+
     </View>
   );
 }

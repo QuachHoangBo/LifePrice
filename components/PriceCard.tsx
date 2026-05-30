@@ -69,9 +69,12 @@ export function PriceCard({
             accessibilityHint="Mở màn hình biến động giá theo ngày"
             hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
             onPress={onHistoryPress}
-            className="rounded-full bg-slate-100 px-3 py-1.5 active:opacity-70"
+            className="shrink-0 rounded-full bg-slate-100 px-3 py-1.5 active:opacity-70"
           >
-            <Text className="text-xs font-semibold text-slate-700">
+          <Text
+            numberOfLines={1}
+            className="text-xs font-semibold text-slate-700"
+          >
               Lịch sử
             </Text>
           </Pressable>
